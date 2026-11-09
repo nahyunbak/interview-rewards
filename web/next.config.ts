@@ -1,16 +1,11 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+const projectRoot = process.env.VERCEL
+  ? process.cwd()
+  : path.resolve(process.cwd(), "..");
 const config: NextConfig = {
-  turbopack: { root: path.resolve(process.cwd(), "..") },
-  outputFileTracingRoot: path.resolve(process.cwd(), ".."),
-  async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: "http://127.0.0.1:3411/api/:path*",
-      },
-    ];
-  },
+  turbopack: { root: projectRoot },
+  outputFileTracingRoot: projectRoot,
   async headers() {
     return [
       {

@@ -1130,3 +1130,124 @@ footer {
     padding: 5px 7px;
   }
 }
+body:has(.role-switchbar) {
+  padding-top: 42px;
+}
+.role-switchbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 42px;
+  z-index: 40;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.role-switch-inner {
+  max-width: 1224px;
+  height: 100%;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.role-switchbar .workspace-tabs {
+  padding: 2px;
+  border-radius: 6px;
+  background: #eef2f8;
+  gap: 2px;
+}
+.role-switchbar .workspace-tabs button {
+  font-size: 12px;
+  padding: 3px 18px;
+  height: 30px;
+  border-radius: 5px;
+}
+.role-switchbar .account {
+  font-size: 12px;
+}
+.role-switchbar .avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+.role-switchbar .account small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.room-link-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: #e8eefb;
+  border: 1px solid #cddbf8;
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+}
+.room-link-panel a {
+  display: block;
+  font-size: 13px;
+  word-break: break-all;
+  margin-top: 5px;
+  color: var(--blue);
+}
+.room-link-panel button {
+  white-space: nowrap;
+}
+.metrics .amount-small {
+  font-size: 23px;
+}
+.funding-note {
+  font-size: 12px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  margin-top: 30px;
+}
+.room-heading h1 {
+  font-size: 32px;
+  letter-spacing: -1px;
+}
+.approval-panel + .approval-panel {
+  margin-top: 14px;
+}
+.campaign-table td:first-child {
+  white-space: normal;
+  max-width: 420px;
+}
+.campaign-table td small {
+  max-width: 420px;
+  line-height: 1.5;
+}
+@media (max-width: 1300px) {
+  .role-switch-inner {
+    margin: 0 40px;
+  }
+}
+@media (max-width: 600px) {
+  .role-switch-inner {
+    margin: 0 16px;
+    gap: 8px;
+  }
+  .role-switchbar .workspace-tabs button {
+    padding: 3px 10px;
+    font-size: 11px;
+  }
+  .role-switchbar .account small {
+    display: none;
+  }
+  .role-switchbar .account {
+    gap: 5px;
+  }
+  .room-link-panel {
+    display: block;
+  }
+  .room-link-panel button {
+    margin-top: 12px;
+  }
+  .metrics .amount-small {
+    font-size: 20px;
+  }
+}

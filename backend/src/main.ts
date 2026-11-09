@@ -33,6 +33,7 @@ import {
 } from "./domain";
 import { addressValid, verifyWallet, processPayouts, explorer } from "./chain";
 import { transcribe, speak, nextQuestion, judge } from "./ai";
+import { mockStudies } from "./mock-studies";
 const db = new PrismaClient();
 const origin = process.env.PUBLIC_ORIGIN || "http://localhost:3410";
 const adminSessions = new Map<string, number>();
@@ -51,16 +52,51 @@ function admin(req: Request) {
   if (!expires || expires < Date.now())
     fail("운영자 로그인이 필요합니다.", 401);
 }
+async function workspace(req: Request) {
+  const value = req.cookies?.workspace;
+  const w =
+    typeof value === "string"
+      ? await db.workspace.findUnique({ where: { sessionHash: hash(value) } })
+      : null;
+  if (!w || w.expiresAt.getTime() < Date.now())
+    return fail("체험 계정 세션이 만료되었습니다. 새로고침해주세요.", 401);
+  return w;
+}
+async function approvePayout(id: string) {
+  return db.$transaction(async (tx) => {
+    const p = await tx.payout.findUnique({
+      where: { interviewId: id },
+      include: { interview: true },
+    });
+    if (
+      !p ||
+      p.interview.mode !== "manual" ||
+      p.interview.status !== "completed"
+    )
+      return fail("승인할 수 없는 평가입니다.", 409);
+    if (p.status !== "awaiting_approval") return { status: p.status };
+    await tx.payout.update({
+      where: { id: p.id },
+      data: { status: "queued", approvedAt: new Date() },
+    });
+    await tx.audit.create({ data: { action: "approve", targetId: id } });
+    return { status: "queued" };
+  });
+}
 async function owned(req: Request, id: string) {
   const i = await db.interview.findUnique({
     where: { id },
     include: { payout: true },
   });
-  if (
-    !i ||
-    !equal(i.sessionHash, hash(req.cookies?.participant || "")) ||
-    i.expiresAt.getTime() < Date.now()
-  )
+  if (!i) return fail("인터뷰 접근 권한이 없습니다.", 401);
+  const participant =
+    equal(i.sessionHash, hash(req.cookies?.participant || "")) &&
+    i.expiresAt.getTime() > Date.now();
+  const w =
+    !participant && i.participantWorkspaceId
+      ? await workspace(req).catch(() => null)
+      : null;
+  if (!participant && w?.id !== i.participantWorkspaceId)
     return fail(
       "인터뷰 접근 권한이 없습니다. 초대 링크에서 지갑을 다시 연결해주세요.",
       401,
@@ -145,6 +181,142 @@ class Api {
   @Get("health") health() {
     return { ok: true, network: "testnet" };
   }
+  @Post("workspace/session") async workspaceSession(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    let w = await workspace(req).catch(() => null);
+    if (!w) {
+      const value = token();
+      w = await db.workspace.create({
+        data: {
+          sessionHash: hash(value),
+          expiresAt: new Date(Date.now() + 8 * 3600000),
+        },
+      });
+      res.cookie("workspace", value, options);
+    }
+    const workspaceId = w.id;
+    await db.$transaction(async (tx) => {
+      const existing = await tx.study.findMany({
+        where: { workspaceId },
+        select: { title: true },
+      });
+      const missing = mockStudies
+        .filter((study) => !existing.some((saved) => saved.title === study.title))
+        .slice(0, Math.max(0, 10 - existing.length));
+      if (missing.length)
+        await tx.study.createMany({
+          data: missing.map((study) => ({
+            ...parseStudy(study),
+            workspaceId,
+            maxAmount: JSON.stringify({ base: max("base"), solana: max("solana") }),
+          })),
+        });
+    });
+    return { name: "김하늘", accountType: "체험 계정", expiresAt: w.expiresAt };
+  }
+  @Get("workspace") async workspaceData(@Req() req: Request) {
+    const w = await workspace(req);
+    const studies = await db.study.findMany({
+      where: { workspaceId: w.id },
+      include: {
+        invites: {
+          select: { interview: { select: { id: true, status: true } } },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const interviews = await db.interview.findMany({
+      where: { invite: { study: { workspaceId: w.id } } },
+      include: { payout: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    const mine = await db.interview.findMany({
+      where: { participantWorkspaceId: w.id },
+      include: { payout: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    return {
+      name: "김하늘",
+      payoutEnabled: process.env.PAYOUT_ENABLED === "true",
+      campaigns: studies.map((s) => ({
+        id: s.id,
+        title: s.title,
+        context: s.context,
+        questions: JSON.parse(s.questions),
+        mode: s.mode,
+        rewards: JSON.parse(s.maxAmount),
+        done: s.invites.filter((i) => i.interview?.status === "completed")
+          .length,
+      })),
+      interviews: interviews.map(view),
+      mine: mine.map(view),
+    };
+  }
+  @Post("workspace/campaigns") async createCampaign(
+    @Req() req: Request,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const w = await workspace(req);
+    let data;
+    try {
+      data = parseStudy(body);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+    return db.$transaction(async (tx) => {
+      if ((await tx.study.count({ where: { workspaceId: w.id } })) >= 10)
+        return fail("체험 계정은 캠페인 10개까지 만들 수 있습니다.", 409);
+      const s = await tx.study.create({
+        data: {
+          ...data,
+          workspaceId: w.id,
+          maxAmount: JSON.stringify({
+            base: max("base"),
+            solana: max("solana"),
+          }),
+        },
+      });
+      return { id: s.id };
+    });
+  }
+  @Post("workspace/campaigns/:id/invites") async campaignInvite(
+    @Req() req: Request,
+    @Param("id") id: string,
+  ) {
+    const w = await workspace(req);
+    const value = token();
+    await db.$transaction(async (tx) => {
+      const s = await tx.study.findFirst({
+        where: { id, workspaceId: w.id, active: true },
+      });
+      if (!s) return fail("캠페인 접근 권한이 없습니다.", 404);
+      if ((await tx.invite.count({ where: { studyId: id } })) >= 20)
+        return fail("캠페인당 참여 링크는 20개까지 발급할 수 있습니다.", 409);
+      await tx.invite.create({
+        data: {
+          studyId: id,
+          tokenHash: hash(value),
+          expiresAt: new Date(Date.now() + 7 * 86400000),
+        },
+      });
+    });
+    return { path: `/room/${value}` };
+  }
+  @Post("workspace/interviews/:id/approve") async workspaceApprove(
+    @Req() req: Request,
+    @Param("id") id: string,
+  ) {
+    const w = await workspace(req);
+    const i = await db.interview.findFirst({
+      where: { id, invite: { study: { workspaceId: w.id } } },
+    });
+    if (!i) return fail("인터뷰 접근 권한이 없습니다.", 404);
+    return approvePayout(id);
+  }
   @Post("admin/login") login(
     @Body() body: { token?: string },
     @Res({ passthrough: true }) res: Response,
@@ -221,26 +393,7 @@ class Api {
     @Param("id") id: string,
   ) {
     admin(req);
-    return db.$transaction(async (tx) => {
-      const payout = await tx.payout.findUnique({
-        where: { interviewId: id },
-        include: { interview: true },
-      });
-      if (
-        !payout ||
-        payout.interview.mode !== "manual" ||
-        payout.interview.status !== "completed"
-      )
-        return fail("승인할 수 없는 평가입니다.", 409);
-      if (payout.status !== "awaiting_approval")
-        return { status: payout.status };
-      await tx.payout.update({
-        where: { id: payout.id },
-        data: { status: "queued", approvedAt: new Date() },
-      });
-      await tx.audit.create({ data: { action: "approve", targetId: id } });
-      return { status: "queued" };
-    });
+    return approvePayout(id);
   }
   @Post("admin/interviews/:id/rejudge") async rejudge(
     @Req() req: Request,
@@ -304,6 +457,7 @@ class Api {
     return { id: c.id, message };
   }
   @Post("auth/verify") async verify(
+    @Req() req: Request,
     @Body()
     body: {
       id?: string;
@@ -333,6 +487,7 @@ class Api {
       ).catch(() => false))
     )
       return fail("서명 검증 실패", 401);
+    const participantWorkspace = await workspace(req).catch(() => null);
     const session = token();
     const result = await db.$transaction(async (tx) => {
       const used = await tx.challenge.updateMany({
@@ -389,6 +544,7 @@ class Api {
       return tx.interview.create({
         data: {
           inviteId: invite.id,
+          participantWorkspaceId: participantWorkspace?.id || null,
           chain: c.chain,
           address: c.address,
           provider: body.provider!,
@@ -629,6 +785,9 @@ async function main() {
       })
       .catch(() => undefined);
   }, 60000).unref();
-  await app.listen(Number(process.env.PORT || 3411), "127.0.0.1");
+  await app.listen(
+    Number(process.env.PORT || 3411),
+    process.env.LISTEN_HOST || "127.0.0.1",
+  );
 }
 void main();

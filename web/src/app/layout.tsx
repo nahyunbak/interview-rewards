@@ -15,6 +15,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko" className={pretendard.variable}>
       <body>
+        {process.env.NODE_ENV === "development" &&
+        process.env.FIGMA_CAPTURE === "true" ? (
+          <script
+            src="https://mcp.figma.com/mcp/html-to-design/capture.js"
+            async
+          />
+        ) : null}
         <a className="skip" href="#main">
           본문으로 이동
         </a>
@@ -23,9 +30,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             VOICE <span>/</span> VALUE
           </Link>
           <span className="network-tag">TESTNET EXPERIENCE</span>
-          <a href="/admin" className="admin-link">
+          <Link href="/?mode=campaign" className="admin-link">
             리서치 관리 ↗
-          </a>
+          </Link>
         </header>
         {children}
         <footer>

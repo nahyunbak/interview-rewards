@@ -11,7 +11,7 @@ mkdir -p /home/ubuntu/interview-rewards-data
 pnpm --dir backend db:migrate
 pm2 startOrRestart deploy/ecosystem.config.cjs --update-env
 for attempt in $(seq 1 20); do
-  if curl -fsS http://127.0.0.1:3411/api/health && curl -fsS http://172.18.0.1:3410/ >/dev/null; then exit 0; fi
+  if curl -fsS http://172.18.0.1:3411/api/health; then exit 0; fi
   sleep 1
 done
 exit 1

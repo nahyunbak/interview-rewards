@@ -5,7 +5,14 @@ datasource db {
   provider = "sqlite"
   url = env("DATABASE_URL")
 }
+model Workspace {
+  id String @id @default(uuid())
+  sessionHash String @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
 model Study {
+  workspaceId String?
   id String @id @default(uuid())
   title String
   context String
@@ -34,6 +41,7 @@ model Challenge {
   used Boolean @default(false)
 }
 model Interview {
+  participantWorkspaceId String?
   id String @id @default(uuid())
   inviteId String @unique
   invite Invite @relation(fields:[inviteId], references:[id])

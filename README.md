@@ -1,6 +1,8 @@
 # VOICE / VALUE — 인터뷰 리워드
 
-테스트 배포: https://interview.43.202.185.137.sslip.io · 운영자: https://interview.43.202.185.137.sslip.io/admin
+프론트(Vercel): https://interview-rewards.vercel.app · API(EC2): https://interview.43.202.185.137.sslip.io/api/health
+
+Figma: https://www.figma.com/design/wAQhZ60tO1hi7ogLknvPJz?node-id=6-2
 
 현재 웹·API는 배포됨. 테스트 자산 미충전으로 송금은 비활성이고 온체인 확정 검증은 남아 있다. [QA 보고서](QA.md)를 참고한다.
 
@@ -21,15 +23,25 @@ pnpm --dir backend start
 pnpm --dir web dev
 ```
 
-웹: http://localhost:3410 · 운영자: http://localhost:3410/admin. 모든 브라우저 API는 Next의 동일 출처 프록시를 통해 호출한다. API는 127.0.0.1:3411에만 바인딩한다.
+웹: http://localhost:3410 · 운영자: http://localhost:3410/admin. 모든 브라우저 API는 Next의 동일 출처 프록시를 통해 호출한다. 로컬 API는 127.0.0.1:3411에 바인딩한다. Vercel의 `API_ORIGIN`은 EC2 HTTPS 주소이며, Proxy가 브라우저 Origin을 확인한 뒤 쿠키와 요청을 EC2로 전달한다.
 
 ## 첫 화면
 
-`/`는 랜딩이 아니라 로그인된 김하늘 예시 계정의 워크스페이스다. `인터뷰 참여자` 탭은 캠페인·내역·리워드를, `캠페인 집행` 탭은 캠페인 목록·생성·수동/자동 모드·승인을 보여준다. 예시 데이터 변경은 화면 내 샘플 상태만 변경하고 실제 API·자산에는 영향을 주지 않는다. 실제 운영은 `/admin`, 실제 참여는 `/?invite=...`로 연결된다.
+`/`에 42px 높이의 상단 고정 역할 바와 체험 계정 화면을 바로 표시한다. `인터뷰 참여자 / 캠페인 집행` 선택에 따라 본문이 전환된다. 서버가 HttpOnly 쿠키로 브라우저별 체험 계정을 발급하고, 목 인터뷰 캠페인 8개를 실제 DB에 만든다. 캠페인 생성·질문 저장·참여 링크 발급·승인은 모두 EC2 API와 연결되어 있다. 계정 세션은 8시간이며, 개인 신원 인증은 아니다.
+
+캠페인은 계정당 10개, 링크는 캠페인당 20개로 제한한다. 다른 체험 계정의 캠페인·답변·승인에는 접근할 수 없다. 예전 샘플 잔액과 완료 내역을 제거했고 실제 저장된 결과만 보여준다.
+
+## 목 인터뷰
+
+독서·쇼핑·식사·운동·여행·협업·AI 도구·구독 서비스의 8개 주제를 제공한다. 주제마다 질문 2–4개가 있으며 수동 승인 4개, 자동 지급 4개다. 참여자 탭에서 바로 인터뷰룸에 입장하거나 캠페인 집행 탭에서 질문과 참여 링크를 확인할 수 있다.
+
+템플릿은 `backend/src/mock-studies.ts`에서 관리한다. 새 계정에 자동 등록하고 기존 계정에도 다음 페이지 로드 시 누락 주제를 추가한다. 기존 캠페인·질문을 덮어쓰지 않으며 계정당 10개 한도를 유지한다. 예시 질문만 제공하고 가짜 답변·점수·지급 완료 내역은 생성하지 않는다. 실제 참여에는 지갑 서명과 마이크가 필요하다.
+
+[현재 PRD](인터뷰%20리워드-prd.md)
 
 ## 핵심 흐름
 
-1. 운영자 키로 로그인하고 질문 1–5개와 지급 방식(manual/automatic)을 지정해 일회 참여 링크를 만든다.
+1. 로그인된 체험 계정의 캠페인 집행 탭에서 질문 1–5개와 지급 방식(manual/automatic)을 저장한 뒤 `/room/<token>` 일회 참여 링크를 발급한다. `/admin`은 기존 운영자 키가 필요한 관리 경로로 유지한다.
 2. 참여자는 Base/Solana 및 MetaMask/Phantom을 선택한다. 지갑 메시지 서명은 주소 소유 확인이며 사용자 자산을 이동하지 않는다. 지급 네트워크는 서명 메시지에 명시하며 서버가 테스트넷을 강제한다.
 3. 카메라는 로컬 미리보기만 제공한다. 답변별 음성을 서버로 전송해 OpenAI가 전사하며, AI는 이전 답변과 다음 질문을 연결한다. 질문별 최대 3분이다. 원본 음성은 메모리에서만 처리하고 저장하지 않는다.
 4. 별도 Judge 호출이 구체성·근거·관련성을 0–2점으로 평가한다. 엄격한 JSON 스키마와 실제 발언 인용을 서버에서 검증한다. 오류·근거 불일치 시 검토 상태이며 송금하지 않는다.
@@ -60,6 +72,18 @@ pnpm check
 
 ## 배포
 
-`deploy/ecosystem.config.cjs`는 확인된 moted EC2의 Docker 게이트웨이(172.18.0.1)를 사용한다. 외부 공개는 Caddy HTTPS만 사용하며 앱 포트는 보안 그룹에 추가하지 않는다. `deploy/install.sh`는 환경 파일이 준비된 새 배포 폴더에서 의존성·Prisma·프로세스 시작을 수행한다. 로컬에서 미리 `web/.next`와 `backend/dist`를 빌드해 전달한다.
+프론트는 Vercel `interview-rewards`, 서버는 기존 moted EC2의 `interview-rewards-api` PM2 프로세스다. 이전 EC2 웹 프로세스는 종료했다. EC2 Nest 서버는 `LISTEN_HOST=172.18.0.1`로 Docker 게이트웨이에서 수신하고, 기존 Caddy가 `/api/*`만 API에 전달한다. 그 외 기존 EC2 웹 주소는 Vercel로 리다이렉트한다. 앱 포트는 보안 그룹에 추가하지 않는다.
 
-배포 전 기존 Caddyfile을 백업하고 `interview.43.202.185.137.sslip.io` 호스트 블록만 추가한다. Caddy validate 후 reload한다. 복구는 새 PM2 프로세스 두 개를 중지하고 Caddyfile 백업을 복원한다. 기존 서비스나 DB에는 변경하지 않는다. 승인받은 임시 SSH 규칙은 배포 종료 후 제거한다.
+프론트 단독 배포 준비 및 실행:
+
+```sh
+node scripts/prepare-web-deploy.cjs
+pnpm --dir web check
+vercel deploy --prod --yes --scope nahyunbak-navercoms-projects --cwd web
+```
+
+`web/pnpm-lock.yaml`은 루트 lock의 web importer와 동일 버전으로 만든 단독 배포용 잠금 파일이다. 루트 의존성 변경 시 준비 스크립트를 다시 실행한다. Vercel에는 공개 `API_ORIGIN`만 설정하며 OpenAI·지갑 키는 EC2에만 둔다. 캡처 스크립트는 로컬 개발에서 `FIGMA_CAPTURE=true`일 때만 활성화된다.
+
+API는 로컬에서 `backend/dist`를 빌드하고 `backend/prisma`와 함께 EC2에 전달한 뒤 클라이언트 생성·마이그레이션·API 재시작을 수행한다. `deploy/install.sh`와 API 전용 PM2 설정을 참고한다. 기존 다른 서비스와 DB는 수정하지 않는다.
+
+Vercel 프록시의 요청 크기를 고려해 프론트 음성은 64kbps·최대 3분·2.5MB로 제한한다. 체인 확정 전에는 지급 완료를 표시하지 않는다. 테스트 지갑 충전과 온체인 송금 검증은 아직 남아 있다.

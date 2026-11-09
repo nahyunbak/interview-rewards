@@ -130,7 +130,13 @@ export default function Admin() {
                       .filter(Boolean),
                     mode,
                   });
-                  setUrl(r.url);
+                  const inviteUrl = new URL(r.url);
+                  setUrl(
+                    new URL(
+                      inviteUrl.pathname + inviteUrl.search,
+                      window.location.origin,
+                    ).toString(),
+                  );
                 });
               }}
             >

@@ -10,7 +10,13 @@ type Invite = {
   rewards: Record<string, string>;
   aiReady: boolean;
 };
-export default function Interview({ initialToken }: { initialToken: string }) {
+export default function Interview({
+  initialToken,
+  initialId,
+}: {
+  initialToken: string;
+  initialId?: string;
+}) {
   const [invite, setInvite] = useState<Invite | null>(null),
     [inviteToken, setInviteToken] = useState(initialToken),
     [chain, setChain] = useState("base"),
@@ -50,7 +56,7 @@ export default function Interview({ initialToken }: { initialToken: string }) {
           setInviteToken(t);
           setError(e.message);
         });
-    const id = sessionStorage.getItem("interviewId:" + t);
+    const id = initialId || sessionStorage.getItem("interviewId:" + t);
     if (id)
       api<Result>(`interviews/${id}`)
         .then(setResult)
@@ -60,7 +66,7 @@ export default function Interview({ initialToken }: { initialToken: string }) {
       audio.current?.pause();
       if (recordingTimer.current) clearTimeout(recordingTimer.current);
     };
-  }, [initialToken]);
+  }, [initialToken, initialId]);
   useEffect(() => {
     if (video.current && stream.current)
       video.current.srcObject = stream.current;
@@ -156,8 +162,10 @@ export default function Interview({ initialToken }: { initialToken: string }) {
       if (recordingTimer.current) clearTimeout(recordingTimer.current);
       void task(async () => {
         const blob = new Blob(chunks, { type });
-        if (blob.size > 10 * 1024 * 1024)
-          throw new Error("답변이 너무 깁니다. 3분 이내로 다시 녹음해주세요.");
+        if (blob.size > 2.5 * 1024 * 1024)
+          throw new Error(
+            "답변 파일이 2.5MB를 넘었습니다. 3분 이내로 다시 녹음해주세요.",
+          );
         const data = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () =>
@@ -196,13 +204,13 @@ export default function Interview({ initialToken }: { initialToken: string }) {
       <div className="eyebrow">
         <span className="dot" /> 당신의 경험이 제품의 다음을 만듭니다
       </div>
-      <div className="heading-row">
+      <div className="heading-row room-heading">
         <h1>
           {isResult
-            ? "경험의 가치를\n확인해보세요."
+            ? "인터뷰 결과"
             : isInterview
-              ? "편하게,\n당신의 이야기로."
-              : "좋은 질문에,\n당신만의 경험을."}
+              ? "AI 인터뷰룸"
+              : "인터뷰 입장 준비"}
         </h1>
         <p className="intro">
           AI와 이야기하고, 답변의 가치를 확인하세요.

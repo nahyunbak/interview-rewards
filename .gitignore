@@ -8,3 +8,5 @@ dist/
 *.db-*
 *.tsbuildinfo
 artifacts/
+
+.vercel/
