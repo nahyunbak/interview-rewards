@@ -1,0 +1,1 @@
+module.exports={apps:[{name:'interview-rewards-api',cwd:__dirname+'/../backend',script:'dist/main.js',instances:1,exec_mode:'fork',max_memory_restart:'220M',node_args:'--max-old-space-size=160',env:{NODE_ENV:'production'}}]};

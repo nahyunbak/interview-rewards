@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "sqlite"
+  url = env("DATABASE_URL")
+}
+model Workspace {
+  id String @id @default(uuid())
+  sessionHash String @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+model Study {
+  workspaceId String?
+  id String @id @default(uuid())
+  title String
+  context String
+  questions String
+  mode String
+  maxAmount String
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  invites Invite[]
+}
+model Invite {
+  id String @id @default(uuid())
+  tokenHash String @unique
+  studyId String
+  study Study @relation(fields:[studyId], references:[id])
+  expiresAt DateTime
+  interview Interview?
+}
+model Challenge {
+  id String @id @default(uuid())
+  inviteId String
+  chain String
+  address String
+  message String
+  expiresAt DateTime
+  used Boolean @default(false)
+}
+model Interview {
+  participantWorkspaceId String?
+  id String @id @default(uuid())
+  inviteId String @unique
+  invite Invite @relation(fields:[inviteId], references:[id])
+  chain String
+  address String
+  provider String
+  sessionHash String
+  expiresAt DateTime
+  mode String
+  status String @default("ready")
+  snapshot String
+  transcript String @default("[]")
+  currentQuestion String?
+  evaluation String?
+  error String?
+  busyUntil DateTime?
+  consentAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  payout Payout?
+}
+model Payout {
+  id String @id @default(uuid())
+  interviewId String @unique
+  interview Interview @relation(fields:[interviewId], references:[id])
+  amount String
+  status String
+  rawTx String?
+  txId String?
+  validUntil String?
+  error String?
+  approvedAt DateTime?
+  confirmedAt DateTime?
+  createdAt DateTime @default(now())
+}
+model Audit {
+  id String @id @default(uuid())
+  action String
+  targetId String
+  createdAt DateTime @default(now())
+}

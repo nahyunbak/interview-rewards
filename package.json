@@ -1,0 +1,8 @@
+{
+  "name": "interview-rewards",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "scripts": {
+    "check": "pnpm --dir backend lint && pnpm --dir backend typecheck && pnpm --dir backend build && pnpm --dir backend test && pnpm --dir web check"
+  }
+}
