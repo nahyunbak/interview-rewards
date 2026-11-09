@@ -29,3 +29,11 @@
 실자산을 보내지 않는다. 테스트넷으로 표시된 faucet만 사용한다.
 
 QA 증거: https://drive.google.com/drive/folders/13YLud7h_ehdSSIe1Ccae6wsYdGUy8thV
+
+## 최종 UI 변경 — 로그인된 예시 워크스페이스
+
+- 기본 `/`에서 랜딩을 제거하고 `인터뷰 참여자 / 캠페인 집행` 두 탭을 직접 표시한다. 김하늘 예시 계정·샘플 데이터를 미리 제공한다.
+- 실제 배포 브라우저에서 탭 전환, 캠페인 초안 생성, 자동 지급 모드 선택, 수동 승인 후 버튼 비활성·대기 건수 변경 확인.
+- 예시 변경은 클라이언트 샘플 상태이며 실제 캠페인·서명·AI 호출·지급 DB와 분리된다. 실제 운영은 `/admin`, 실제 인터뷰는 발급한 초대 링크로 이용한다.
+- 최신 화면 증거는 `dashboard-participant.png`, `dashboard-campaign.png`, `campaign-create.png`, `dashboard-mobile.png`다. 기존 home/participant 이미지는 변경 전 QA 기록이다.
+- 최종 웹 lint·typecheck·build 및 지갑 어댑터 테스트 5개 통과. 기존 API 테스트 7개와 배포 네 조합 검증 결과 유지.

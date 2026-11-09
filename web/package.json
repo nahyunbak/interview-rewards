@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "test": "node --test test/*.test.cjs"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "next": "16.2.12",
